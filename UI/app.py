@@ -244,6 +244,11 @@ def get_database_statistics():
             stats["extraction_success_rate"] = round((successful_extractions / stats["total_extractions"]) * 100, 1)
         else:
             stats["extraction_success_rate"] = 0
+        
+        # Count unique NCT IDs
+        c.execute("SELECT COUNT(DISTINCT JSON_EXTRACT(state_json, '$.nct_id')) FROM extraction_states WHERE JSON_EXTRACT(state_json, '$.nct_id') IS NOT NULL AND JSON_EXTRACT(state_json, '$.nct_id') != ''")
+        result = c.fetchone()
+        stats["unique_nct_ids"] = result[0] if result and result[0] else 0
             
     except Exception as e:
         st.error(f"Error retrieving database statistics: {str(e)}")
@@ -267,6 +272,9 @@ def display_database_statistics():
                 with col2:
                     st.metric("🔍 Total Extractions", stats.get("total_extractions", 0))
                     st.metric("📁 Files Uploaded", stats.get("total_files_uploaded", 0))
+                
+                # Unique NCT IDs
+                st.metric("🔬 Unique Clinical Trials (NCT IDs)", stats.get("unique_nct_ids", 0))
                 
                 st.divider()
                 
