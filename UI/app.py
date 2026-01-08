@@ -183,6 +183,129 @@ def get_all_conversations():
     conn.close()
     return conversations
 
+def get_database_statistics():
+    """Get statistics about the database including record counts and sizes"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    stats = {}
+    
+    try:
+        # Count total messages
+        c.execute("SELECT COUNT(*) FROM chat_messages")
+        stats["total_messages"] = c.fetchone()[0]
+        
+        # Count conversations
+        c.execute("SELECT COUNT(DISTINCT conversation_id) FROM chat_messages")
+        stats["total_conversations"] = c.fetchone()[0]
+        
+        # Count extraction states
+        c.execute("SELECT COUNT(*) FROM extraction_states")
+        stats["total_extractions"] = c.fetchone()[0]
+        
+        # Count uploaded files
+        c.execute("SELECT COUNT(*) FROM uploaded_files")
+        stats["total_files_uploaded"] = c.fetchone()[0]
+        
+        # Get total file size (in MB)
+        c.execute("SELECT COALESCE(SUM(file_size), 0) FROM uploaded_files")
+        total_bytes = c.fetchone()[0]
+        stats["total_file_size_mb"] = round(total_bytes / (1024 * 1024), 2)
+        
+        # Count messages by role
+        c.execute("SELECT role, COUNT(*) FROM chat_messages GROUP BY role")
+        role_counts = c.fetchall()
+        stats["messages_by_role"] = {role: count for role, count in role_counts}
+        
+        # Count message types
+        c.execute("SELECT message_type, COUNT(*) FROM chat_messages WHERE message_type IS NOT NULL GROUP BY message_type")
+        type_counts = c.fetchall()
+        stats["messages_by_type"] = {msg_type: count for msg_type, count in type_counts}
+        
+        # Get database file size
+        if os.path.exists(DB_FILE):
+            db_size_bytes = os.path.getsize(DB_FILE)
+            stats["database_file_size_mb"] = round(db_size_bytes / (1024 * 1024), 2)
+        else:
+            stats["database_file_size_mb"] = 0
+        
+        # Get average messages per conversation
+        if stats["total_conversations"] > 0:
+            c.execute("SELECT AVG(msg_count) FROM (SELECT COUNT(*) as msg_count FROM chat_messages GROUP BY conversation_id)")
+            avg = c.fetchone()[0]
+            stats["avg_messages_per_conversation"] = round(avg, 1) if avg else 0
+        else:
+            stats["avg_messages_per_conversation"] = 0
+        
+        # Get extraction success rate
+        c.execute("SELECT COUNT(*) FROM extraction_states WHERE state_json LIKE '%\"nct_id\"%'")
+        successful_extractions = c.fetchone()[0]
+        if stats["total_extractions"] > 0:
+            stats["extraction_success_rate"] = round((successful_extractions / stats["total_extractions"]) * 100, 1)
+        else:
+            stats["extraction_success_rate"] = 0
+            
+    except Exception as e:
+        st.error(f"Error retrieving database statistics: {str(e)}")
+    finally:
+        conn.close()
+    
+    return stats
+
+def display_database_statistics():
+    """Display database statistics in the sidebar"""
+    with st.sidebar:
+        if st.button("📊 Database Statistics", use_container_width=True):
+            stats = get_database_statistics()
+            
+            with st.expander("📊 Database Statistics", expanded=True):
+                # Main statistics
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("💬 Total Conversations", stats.get("total_conversations", 0))
+                    st.metric("📄 Total Messages", stats.get("total_messages", 0))
+                with col2:
+                    st.metric("🔍 Total Extractions", stats.get("total_extractions", 0))
+                    st.metric("📁 Files Uploaded", stats.get("total_files_uploaded", 0))
+                
+                st.divider()
+                
+                # File and database sizes
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("💾 Uploaded Files Size", f"{stats.get('total_file_size_mb', 0)} MB")
+                with col2:
+                    st.metric("📦 Database Size", f"{stats.get('database_file_size_mb', 0)} MB")
+                
+                st.divider()
+                
+                # Average metrics
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("📊 Avg Messages/Conversation", stats.get("avg_messages_per_conversation", 0))
+                with col2:
+                    st.metric("✅ Extraction Success Rate", f"{stats.get('extraction_success_rate', 0)}%")
+                
+                st.divider()
+                
+                # Messages by role breakdown
+                st.subheader("💬 Messages by Role")
+                role_data = stats.get("messages_by_role", {})
+                if role_data:
+                    for role, count in role_data.items():
+                        st.write(f"• **{role.capitalize()}**: {count} messages")
+                else:
+                    st.write("No message data available")
+                
+                # Messages by type breakdown
+                st.subheader("🏷️ Messages by Type")
+                type_data = stats.get("messages_by_type", {})
+                if type_data:
+                    for msg_type, count in type_data.items():
+                        st.write(f"• **{msg_type}**: {count} messages")
+                else:
+                    st.write("No type data available")
+
 def new_chat_click():
     """Callback for starting a new chat - sets flag for main flow to handle rerun"""
     st.session_state.messages = []
@@ -1182,6 +1305,11 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # Sidebar
 st.sidebar.button("➕ Start New Chat", key="new_chat_button", on_click=new_chat_click, use_container_width=True)
+
+st.sidebar.divider()
+
+# Display database statistics button
+display_database_statistics()
 
 st.sidebar.divider()
 
