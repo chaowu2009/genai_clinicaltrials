@@ -15,7 +15,7 @@ OUTPUT_FILE = "nct_ids.txt"
 START_ID = 1
 
 # Parallelism / throttling
-WORKERS = 20
+WORKERS = 40
 BATCH_SIZE = 2000
 REQUEST_TIMEOUT = 10
 BATCH_SLEEP_SECONDS = 0.1
