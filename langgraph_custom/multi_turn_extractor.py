@@ -79,7 +79,9 @@ class MultiTurnExtractor:
             self.llm = ChatOpenAI(
                 model=model, 
                 temperature=temperature,
-                streaming=False  # Disable streaming for re-extraction
+                streaming=False,  # Disable streaming for re-extraction
+                request_timeout=300,  # 5 minutes for large chunks (40k+ tokens)
+                timeout=300  # Connection timeout
             )
             logger.info(f"Created new LLM instance for re-extraction: {model}")
             
@@ -429,7 +431,11 @@ Return JSON with "content" (string with extracted info) and "page_references" (a
         ]
         
         try:
+            logger.info(f"🔄 Calling LLM for {field_name} (chunk: {len(chunk_text)} chars)...")
+            start_time = time.time()
             response = self.llm.invoke(messages)
+            elapsed = time.time() - start_time
+            logger.info(f"✅ LLM response received for {field_name} (took {elapsed:.1f}s)")
             # Safely handle response.content which could be str, dict, list, or other types
             raw_content = response.content
             
@@ -712,7 +718,11 @@ Return the extracted information in JSON format with content and page_references
                     HumanMessage(content=user_prompt)
                 ]
                 
+                logger.info(f"🔄 Calling LLM for {field_name} with feedback (chunk: {len(chunk_text)} chars)...")
+                start_time = time.time()
                 response = self.llm.invoke(messages)
+                elapsed = time.time() - start_time
+                logger.info(f"✅ LLM response received for {field_name} with feedback (took {elapsed:.1f}s)")
                 # Safely handle response.content which could be str, dict, list, or other types
                 raw_content = response.content
                 

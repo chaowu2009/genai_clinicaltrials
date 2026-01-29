@@ -51,10 +51,22 @@ logger = logging.getLogger(__name__)
 # Initialize LLM with streaming support
 # Using gpt-4o-mini for higher rate limits (200k TPM vs 30k TPM for gpt-4o)
 # gpt-4o-mini is 15x cheaper and has 128k context window (same as gpt-4o)
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, streaming=True)
+llm = ChatOpenAI(
+    model="gpt-4o-mini", 
+    temperature=0.1, 
+    streaming=True,
+    request_timeout=300,  # 5 minutes for large chunks
+    timeout=300  # Connection timeout
+)
 
 # Create a non-streaming LLM instance for re-extraction
-llm_non_streaming = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, streaming=False)
+llm_non_streaming = ChatOpenAI(
+    model="gpt-4o-mini", 
+    temperature=0.1, 
+    streaming=False,
+    request_timeout=300,  # 5 minutes for large chunks
+    timeout=300  # Connection timeout
+)
 
 # System message for GPT-4 summarization (from app_v1)
 SYSTEM_MESSAGE = "You are a clinical research summarization expert. Create concise, well-formatted summaries that focus only on available information. Avoid filler text and sections with insufficient data. Use clear markdown formatting and keep summaries under 400 words while including all key available information."

@@ -318,7 +318,7 @@ FIELD_CONFIGS_WITH_SCHEMA = {
     ExtractionFieldType.TREATMENT_ARMS_INTERVENTIONS.value: {
         "schema_class": TreatmentArmsInterventionsExtraction,
         "keywords": ["treatment", "intervention", "arm", "group", "therapy", "dose", "regimen"],
-        "max_tokens": 40000,
+        "max_tokens": 30000,  # Reduced from 40k to prevent timeouts on large chunks
         "priority": 1,
         "description": "All treatment arms with arm names, interventions/drugs for each arm, exact dosing schedules, routes of administration, treatment duration, and any comparator or combination therapy details"
     },
