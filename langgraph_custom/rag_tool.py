@@ -285,7 +285,9 @@ def test_tool_functionality(db_path: str = "db/clinical_trials_vectordb"):
 
 if __name__ == "__main__":
     # Test the tool
-    logging.basicConfig(level=logging.INFO)
+    # Only configure basic logging when run as script
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO)
     
     print("🧪 Testing Clinical Trials RAG Tool...")
     success = test_tool_functionality()

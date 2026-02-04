@@ -11,6 +11,19 @@ import sys
 import os
 import time
 from pathlib import Path
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
+
+# Default to US/Eastern for time functions when possible
+os.environ.setdefault('TZ', 'America/New_York')
+try:
+    time.tzset()
+except Exception:
+    # time.tzset may be unavailable on some platforms (older Windows/Python builds)
+    pass
 
 # Add parent directory to path to import from langgraph folder
 current_dir = Path(__file__).parent
@@ -457,7 +470,15 @@ def create_json_view_tabs(state):
     if ui_state.get("force_json_refresh"):
         last_field = ui_state.get("last_reextraction_field", "unknown")
         last_time = ui_state.get("last_reextraction_time", 0)
-        st.info(f"🔄 **Debug:** JSON view refreshed after re-extracting '{last_field}' at {time.strftime('%H:%M:%S', time.localtime(last_time))}")
+        try:
+            if ZoneInfo:
+                ts = datetime.fromtimestamp(last_time, tz=ZoneInfo('America/New_York'))
+            else:
+                ts = datetime.fromtimestamp(last_time)
+            timestr = ts.strftime('%H:%M:%S %Z').strip()
+        except Exception:
+            timestr = time.strftime('%H:%M:%S', time.localtime(last_time))
+        st.info(f"🔄 **Debug:** JSON view refreshed after re-extracting '{last_field}' at {timestr}")
         # Clear the flag after showing the debug info
         st.session_state.ui_state["force_json_refresh"] = False
     
@@ -1112,21 +1133,39 @@ def _regenerate_summary(state):
                 with col1:
                     try:
                         pdf_data = create_summary_pdf(full_response, state.get('nct_id', 'study'))
+                        # Use a timezone-aware formatted timestamp for filenames/display
+                        ts_epoch = time.time()
+                        try:
+                            from zoneinfo import ZoneInfo
+                            ts_dt = datetime.fromtimestamp(ts_epoch, tz=ZoneInfo('America/New_York'))
+                        except Exception:
+                            ts_dt = datetime.fromtimestamp(ts_epoch)
+                        ts_str = ts_dt.strftime('%Y%m%d_%H%M%S')
                         st.download_button(
                             label="📄 Download PDF",
                             data=pdf_data,
-                            file_name=f"summary_{state.get('nct_id', 'study')}_updated_{int(time.time())}.pdf",
+                            file_name=f"summary_{state.get('nct_id', 'study')}_updated_{ts_str}.pdf",
                             mime="application/pdf",
-                            key=f"regenerated_pdf_download_{int(time.time())}"
+                            key=f"regenerated_pdf_download_{ts_str}"
                         )
                     except Exception as e:
                         st.error("PDF error")
                 st.markdown("---")
             
             # Save to messages and database with metadata to indicate regenerated summary
+            # Preserve epoch for internal use, add human-readable TZ-aware timestamp for display
+            ts_epoch = time.time()
+            try:
+                from zoneinfo import ZoneInfo
+                ts_dt = datetime.fromtimestamp(ts_epoch, tz=ZoneInfo('America/New_York'))
+            except Exception:
+                ts_dt = datetime.fromtimestamp(ts_epoch)
+            ts_display = ts_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
+
             summary_metadata = {
                 "action": "regenerate_summary",
-                "timestamp": time.time(),
+                "timestamp_epoch": ts_epoch,
+                "timestamp": ts_display,
                 "fields_count": len([k for k, v in state.get('parsed_json', {}).items() if v]),
                 "nct_id": state.get('nct_id', 'study'),
                 "fields_with_content": fields_with_content
@@ -1142,7 +1181,9 @@ def _regenerate_summary(state):
             save_message_to_db(st.session_state.current_convo_id, "assistant", full_response, "regenerated_summary", summary_metadata)
             
             # Update the current state with the new summary info
-            state["last_summary_regenerated"] = time.time()
+            # Store both epoch (for internal calculations) and human-readable display string
+            state["last_summary_regenerated_epoch"] = ts_epoch
+            state["last_summary_regenerated"] = ts_display
             save_extraction_state(st.session_state.current_convo_id, state)
             
             st.success("✅ Summary regenerated successfully! You can regenerate again anytime as you continue refining fields.")

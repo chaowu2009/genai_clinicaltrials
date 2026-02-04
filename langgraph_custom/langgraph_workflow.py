@@ -19,6 +19,57 @@ from dotenv import load_dotenv
 import os
 import time
 import logging
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
+
+# Default to US/Eastern for time functions when possible
+os.environ.setdefault('TZ', 'America/New_York')
+try:
+    time.tzset()
+except Exception:
+    pass
+
+
+# Timezone-aware logging formatter (default: US/Eastern)
+class TZFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None, tz_name: str = "America/New_York"):
+        super().__init__(fmt=fmt, datefmt=datefmt)
+        self.tz_name = tz_name
+
+    def formatTime(self, record, datefmt=None):
+        if ZoneInfo:
+            created = datetime.fromtimestamp(record.created, tz=ZoneInfo(self.tz_name))
+        else:
+            created = datetime.fromtimestamp(record.created)
+        if datefmt:
+            try:
+                return created.strftime(datefmt)
+            except Exception:
+                pass
+        return created.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def setup_timezone_logging(tz_name: str = "America/New_York"):
+    root = logging.getLogger()
+    # Replace handlers so our formatter is applied consistently
+    root.handlers = []
+    handler = logging.StreamHandler()
+    fmt = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S %Z"
+    handler.setFormatter(TZFormatter(fmt=fmt, datefmt=datefmt, tz_name=tz_name))
+    root.addHandler(handler)
+    level = os.getenv("LOG_LEVEL", "INFO")
+    try:
+        root.setLevel(getattr(logging, level))
+    except Exception:
+        root.setLevel(logging.INFO)
+
+
+# Initialize root logger early so other modules' basicConfig calls won't override it
+setup_timezone_logging()
 
 # Import parsers - use EnhancedClinicalTrialParser for better accuracy
 from langgraph_custom.enhanced_parser import EnhancedClinicalTrialParser, ClinicalTrialData

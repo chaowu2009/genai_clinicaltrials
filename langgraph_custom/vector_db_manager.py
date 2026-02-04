@@ -468,7 +468,9 @@ class ClinicalTrialsVectorDB:
 def main():
     """Example usage"""
     import logging
-    logging.basicConfig(level=logging.INFO)
+    # Only configure basic logging for standalone execution
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO)
     
     # Initialize vector database
     vector_db = ClinicalTrialsVectorDB()
