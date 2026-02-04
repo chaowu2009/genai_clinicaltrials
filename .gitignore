@@ -1,4 +1,5 @@
 # Environment and secrets
+**/.streamlit/secrets.toml**
 .env
 .streamlit/secrets.toml
 __pycache__/
