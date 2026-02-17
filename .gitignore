@@ -42,7 +42,7 @@ TEST_*.md
 TEST_*.py
 
 # Large PDF test files (add manually if needed)
-*.pdf
+#*.pdf
 
 # Backup files
 *_backup.py
